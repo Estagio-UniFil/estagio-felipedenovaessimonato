@@ -1,29 +1,24 @@
-// ========== DEPENDÊNCIAS ==========
 const express = require('express');
-const { Sequelize, DataTypes } = require('sequelize');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+const { Sequelize, DataTypes } = require('sequelize');
+
+// Iniciar o servidor Express
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ========== CONFIGURAÇÕES ==========
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-// app.use(express.static('public'));
-
-
-// ========== CONEXÃO COM POSTGRESQL ==========
-const sequelize = new Sequelize('postgresql://postgres:fioYAlaMaeAKZjdUlYzFJwKHirRnCJHB@yamabiko.proxy.rlwy.net:16989/railway', {
-    dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
+// Conectar ao banco de dados PostgreSQL usando a variável de ambiente DATABASE_URL
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  dialect: 'postgres',
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
     }
-  });
-  
+  }
+});
 
-// ========== MODELO CLIENTE ==========
+// Definir o modelo de cliente
 const Cliente = sequelize.define('Cliente', {
   nome: DataTypes.STRING,
   cpfCnpj: DataTypes.STRING,
@@ -32,74 +27,64 @@ const Cliente = sequelize.define('Cliente', {
   email: DataTypes.STRING
 });
 
-// ========== SYNC BANCO ==========
+// Sincronizar a tabela do cliente no banco
 sequelize.sync()
   .then(() => {
-    console.log(" Banco sincronizado com sucesso.");
+    console.log("Tabela 'Clientes' criada com sucesso.");
   })
   .catch((err) => {
-    console.error(" Erro ao sincronizar com o banco:", err);
+    console.error("Erro ao criar a tabela 'Clientes':", err);
   });
 
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static('public'));
 
-// ========== ROTAS ==========
+// Rota para exibir o formulário
 app.get('/', async (req, res) => {
-    try {
-      const clientes = await Cliente.findAll();
-      console.log('Clientes encontrados:', clientes);
-  
-      let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
-      let tabela = clientes.map(c => `
-        <tr>
-          <td>${c.nome}</td>
-          <td>${c.cpfCnpj}</td>
-          <td>${c.telefone}</td>
-          <td>${c.endereco}</td>
-          <td>${c.email}</td>
-          <td>
-            <form method="POST" action="/clientes/delete/${c.id}" style="display:inline-block;">
-              <button>Excluir</button>
-            </form>
-            <button onclick="editarCliente('${c.id}', '${c.nome}', '${c.cpfCnpj}', '${c.telefone}', '${c.endereco}', '${c.email}')">
-              Editar
-            </button>
-          </td>
-        </tr>
-      `).join('');
-      
-  
-      html = html.replace('{{tabela_clientes}}', tabela);
-      res.send(html);
-    } catch (error) {
-      console.error('Erro ao carregar a página principal:', error);
-      res.status(500).send('Erro ao carregar a página');
-    }
-  });
-  
+  try {
+    // Buscar todos os clientes no banco
+    const clientes = await Cliente.findAll();
 
-  app.post('/clientes', async (req, res) => {
-    const { id, nome, cpfCnpj, telefone, endereco, email } = req.body;
-  
-    if (id) {
-      // Atualizar cliente existente
-      await Cliente.update(
-        { nome, cpfCnpj, telefone, endereco, email },
-        { where: { id } }
-      );
-    } else {
-      // Criar novo cliente
-      await Cliente.create({ nome, cpfCnpj, telefone, endereco, email });
-    }
-  
-    res.redirect('/');
-  });
-  
+    // Carregar o HTML
+    let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 
-app.post('/clientes/delete/:id', async (req, res) => {
-  await Cliente.destroy({ where: { id: req.params.id } });
-  res.redirect('/');
+    // Gerar a tabela de clientes
+    let tabela = clientes.map(c => `
+      <tr>
+        <td>${c.nome}</td>
+        <td>${c.cpfCnpj}</td>
+        <td>${c.telefone}</td>
+        <td>${c.endereco}</td>
+        <td>${c.email}</td>
+      </tr>
+    `).join('');
+
+    // Substituir o marcador {{tabela_clientes}} no HTML
+    html = html.replace('{{tabela_clientes}}', tabela);
+
+    // Enviar o HTML modificado como resposta
+    res.send(html);
+  } catch (err) {
+    console.error("Erro ao carregar clientes:", err);
+    res.status(500).send("Erro ao carregar clientes");
+  }
 });
 
-// ========== SERVIDOR ==========
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+// Rota para salvar o cliente no banco
+app.post('/clientes', async (req, res) => {
+  const { nome, cpfCnpj, telefone, endereco, email } = req.body;
+  
+  try {
+    await Cliente.create({ nome, cpfCnpj, telefone, endereco, email });
+    res.redirect('/'); // Redireciona de volta para a página principal
+  } catch (err) {
+    console.error("Erro ao salvar cliente:", err);
+    res.status(500).send("Erro ao salvar cliente no banco.");
+  }
+});
+
+// Iniciar o servidor na porta
+app.listen(PORT, () => {
+  console.log(`Servidor rodando em http://localhost:${PORT}`);
+});
