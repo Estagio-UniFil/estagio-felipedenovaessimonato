@@ -33,7 +33,14 @@ const Cliente = sequelize.define('Cliente', {
 });
 
 // ========== SYNC BANCO ==========
-sequelize.sync();
+sequelize.sync()
+  .then(() => {
+    console.log(" Banco sincronizado com sucesso.");
+  })
+  .catch((err) => {
+    console.error(" Erro ao sincronizar com o banco:", err);
+  });
+
 
 // ========== ROTAS ==========
 app.get('/', async (req, res) => {
