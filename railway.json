@@ -1,0 +1,9 @@
+{
+    "build": {
+      "root": "codigo"
+    },
+    "deploy": {
+      "startCommand": "node app.js"
+    }
+  }
+  
